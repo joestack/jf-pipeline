@@ -14,7 +14,7 @@ provider "github" {
 # Repository create
 resource "github_repository" "example_repo" {
   name        = var.repo
-  description = "Repository with protected Workflow"
+  description = "Repository mit geschütztem Workflow"
   visibility  = "public"
   auto_init   = true
 }
@@ -31,18 +31,11 @@ resource "github_branch_protection" "main" {
 
   required_status_checks {
     strict = true
-    contexts = ["workflow-validation"]
   }
 
   allows_deletions = false
   allows_force_pushes = false
 
-  # Specific protection of Workflow-Files 
-  # But not for admins
-  enforce_admins = false
-
-  required_linear_history = true
-  require_signed_commits = true
 }
 
 # Action Variable JF_URL 
@@ -59,11 +52,11 @@ resource "github_actions_secret" "jf_access_token" {
   plaintext_value = var.jf_access_token
 }
 
-#  Workflow-01
+# Path Restriction for Workflows
 resource "github_repository_file" "workflow" {
   repository = github_repository.example_repo.name
   branch     = "main"
-  file       = ".github/workflows/workflow-01.yml"
+  file       = ".github/workflows/workflow.yml"
   content    = <<-EOT
 name: Docker Build Pipeline with Security Scan
 
@@ -109,73 +102,6 @@ jobs:
           name: xray-scan-results
           path: xray-results.json
       - name: Push Docker Image
-        env:
-          IMAGE_NAME: trial3i8n2w.jfrog.io/testpet-docker/jfrog-docker-petclinic-image:$${{ github.run_number }}
-        run: |
-          jf docker push $IMAGE_NAME
-      - name: Publish Build Info
-        if: success()
-        env:
-          JFROG_CLI_BUILD_NAME: secure-docker-build
-          JFROG_CLI_BUILD_NUMBER: $${{ github.run_number }}
-        run: |
-          jf rt build-collect-env
-          jf rt build-add-git
-          jf rt build-publish
-EOT
-}
-
-
-
-#  Workflow-02 
-resource "github_repository_file" "workflow2" {
-  repository = github_repository.example_repo.name
-  branch     = "main"
-  file       = ".github/workflows/workflow-02.yml.nodo"
-  content    = <<-EOT
-name: Docker Build Pipeline with Security Gate
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-
-jobs:
-  build-and-tag:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v4
-        env:
-          JF_URL: $${{ vars.JF_URL }}
-          JF_ACCESS_TOKEN: $${{ secrets.JF_ACCESS_TOKEN }}
-
-      - name: Build & Test
-        run: |
-          # Gradle Build and Tests executions
-          ./gradlew clean build test
-      - name: Build Tag and push Docker Image
-        env:
-          IMAGE_NAME: trial3i8n2w.jfrog.io/testpet-docker/jfrog-docker-petclinic-image:$${{ github.run_number }}
-        run: |
-          jf docker build -t $IMAGE_NAME .
-      - name: Run Xray Security Scan
-        env:
-          IMAGE_NAME: trial3i8n2w.jfrog.io/testpet-docker/jfrog-docker-petclinic-image:$${{ github.run_number }}
-        run: |
-          # Xray Scan 
-          jf docker scan $IMAGE_NAME \
-            --format json \
-            --fail-build \
-            --min-serverity high \
-            || exit 1
-      - name: Push Docker Image
-        if: success()
         env:
           IMAGE_NAME: trial3i8n2w.jfrog.io/testpet-docker/jfrog-docker-petclinic-image:$${{ github.run_number }}
         run: |
